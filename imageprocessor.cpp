@@ -245,6 +245,80 @@ int ImageProcessor::colorBin(int value, int bitness)
 }
 
 
+QImage ImageProcessor::padImage(QImage im, int padding)
+{
+    QImage padded(im.width()+(2*padding), im.height()+(2*padding), im.format());
+    // Pad corners
+    for(int i = 0; i < padding; ++i){
+        for(int j = 0; j < padding; ++j){
+            padded.setPixel(i,j, im.pixel(0,0));
+            padded.setPixel(padded.width()-1-i, j, im.pixel(im.width()-1,0));
+            padded.setPixel(i, padded.height()-1-j, im.pixel(0,im.height()-1));
+            padded.setPixel(padded.width()-1-i, padded.height()-1-j,
+                            im.pixel(im.width()-1,im.height()-1));
+        }
+    }
+    // Pad top and bottom edge
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < padding; ++j){
+            padded.setPixel(padding+i, j, im.pixel(i,0));
+            padded.setPixel(padding+i, padded.height()-1-j, im.pixel(i,im.height()-1));
+        }
+    }
+    // Pad left and right edge
+    for(int i = 0; i < padding; ++i){
+        for(j = 0; j < im.height(); ++j){
+            padded.setPixel(i,padding + j, im.pixel(0,j));
+            padded.setPixel(padded.width()-1-i, padding + j, im.pixel(im.width()-1,j));
+        }
+    }
+    // Fill middle
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < im.height(); ++j){
+            padded(padding+i,padding+j, im.pixel(i,j));
+        }
+    }
+    return padded;
+}
+
+QImage ImageProcessor::removePadding(QImage padded, int padding)
+{
+    QImage unpadded(padded.width()-(2*padding),padded.height()-(2*padding),padded.format());
+    for(int i = 0; i < unpadded.width(); ++i){
+        for(int j = 0; j < unpadded.height(); ++j){
+            unpadded.setPixel(i,j,padded.pixel(padding+i,padding+j));
+        }
+    }
+    return unpadded;
+}
+
+
+int** ImageProcessor::createKernel(QString method, int dim, double highBoostConst)
+{
+    int** kernel;
+    kernel = new int*[dim];
+    return kernel;
+}
+
+QImage ImageProcessor::convolve(QImage im, int **kernel, int dim)
+{
+    int padding = dim/2;
+    int kernelMid = dim/2;
+    QImage padded = padImage(im, padding);
+    QImage procIm(im.width(), im.height(), im.format());
+    for(int i = 0; i < procIm.width(), ++i){
+        for(int j = 0; j < procIm.height(). ++j){
+            double sum = 0;
+            for(int x = -padding; x <= padding; ++x){
+                for(int y = -padding; y <= padding; ++y){
+                    sum +=
+                }
+            }
+        }
+    }
+}
+
+
 void ImageProcessor::on_resizeFactor_valueChanged(int arg1)
 {
     if(arg1 > 100){
@@ -321,4 +395,17 @@ void ImageProcessor::on_applyColorBin_clicked()
         display(m_origIm, m_procIm);
         on_image_process();
     }
+}
+
+void ImageProcessor::on_applyKernelFilter_clicked()
+{
+    if(QString::compare(ui->kernelFilterComboBox->currentText(), tr("High-Boost"))){
+        QImage kernel = createKernel(ui->kernelFilterComboBox->currentText(), ui->kernelSizeSpin->value(),
+                                     ui->hbConstSpin->value());
+    } else {
+        QImage kernel = createKernel(ui->kernelFilterComboBox->currentText(), ui->kernelSizeSpin->value());
+    }
+    m_procIm = convolve(m_origIm, kernel);
+    display(m_origIm, m_procIm);
+    on_image_process();
 }

@@ -30,6 +30,8 @@ private slots:
 
     void on_applyColorBin_clicked();
 
+    void on_applyKernelFilter_clicked();
+
 private:
     void display(QImage origIm, QImage procIm);
     void resetUI();
@@ -44,6 +46,12 @@ private:
     //color resolution
     QImage colorBin(QImage im, int bitness);
     int colorBin(int value, int bitness);
+
+    //kernel filtering
+    int** createKernel(QString method, int dim, double highBoostConst = NULL);
+    QImage convolve(QImage im, int** kernel, int dim);
+    QImage padImage(QImage im, int padding);
+    QImage removePadding(QImage padded, int padding);
 
     QImage m_origIm;
     QImage m_procIm;
