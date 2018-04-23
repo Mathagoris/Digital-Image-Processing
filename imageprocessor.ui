@@ -166,7 +166,7 @@
               <x>10</x>
               <y>0</y>
               <width>231</width>
-              <height>489</height>
+              <height>567</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="vertLayout">
@@ -356,10 +356,10 @@
                <widget class="QLabel" name="bitnessLabel">
                 <property name="geometry">
                  <rect>
-                  <x>30</x>
+                  <x>40</x>
                   <y>30</y>
-                  <width>91</width>
-                  <height>21</height>
+                  <width>61</width>
+                  <height>26</height>
                  </rect>
                 </property>
                 <property name="text">
@@ -404,7 +404,62 @@
               </widget>
              </item>
              <item>
-              <widget class="QGroupBox" name="kernelFilterGroup">
+              <widget class="QGroupBox" name="bitPlaneGroup">
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>95</height>
+                </size>
+               </property>
+               <property name="title">
+                <string>Remove Bit Plane</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <widget class="QLabel" name="bitPlaneLabel">
+                <property name="geometry">
+                 <rect>
+                  <x>40</x>
+                  <y>30</y>
+                  <width>71</width>
+                  <height>26</height>
+                 </rect>
+                </property>
+                <property name="text">
+                 <string>Bit Plane:</string>
+                </property>
+               </widget>
+               <widget class="QSpinBox" name="bitPlane">
+                <property name="geometry">
+                 <rect>
+                  <x>140</x>
+                  <y>30</y>
+                  <width>48</width>
+                  <height>26</height>
+                 </rect>
+                </property>
+                <property name="maximum">
+                 <number>7</number>
+                </property>
+               </widget>
+               <widget class="QPushButton" name="applyBitPlane">
+                <property name="geometry">
+                 <rect>
+                  <x>10</x>
+                  <y>60</y>
+                  <width>211</width>
+                  <height>25</height>
+                 </rect>
+                </property>
+                <property name="text">
+                 <string>Apply</string>
+                </property>
+               </widget>
+              </widget>
+             </item>
+             <item>
+              <widget class="QGroupBox" name="spacialFilterGroup">
                <property name="minimumSize">
                 <size>
                  <width>0</width>
@@ -418,12 +473,12 @@
                 </size>
                </property>
                <property name="title">
-                <string>Kernel Filters</string>
+                <string>Spacial Filters</string>
                </property>
                <property name="alignment">
                 <set>Qt::AlignCenter</set>
                </property>
-               <widget class="QComboBox" name="kernelFilterComboBox">
+               <widget class="QComboBox" name="spacialFilterComboBox">
                 <property name="geometry">
                  <rect>
                   <x>60</x>
@@ -449,7 +504,7 @@
                 </item>
                 <item>
                  <property name="text">
-                  <string>High-Boosting</string>
+                  <string>High-Boost</string>
                  </property>
                 </item>
                </widget>
@@ -466,7 +521,7 @@
                  <string>Filter:</string>
                 </property>
                </widget>
-               <widget class="QLabel" name="kernelSizeLabel">
+               <widget class="QLabel" name="spacialSizeLabel">
                 <property name="geometry">
                  <rect>
                   <x>38</x>
@@ -479,7 +534,7 @@
                  <string>Kernel Size: 3 x</string>
                 </property>
                </widget>
-               <widget class="QSpinBox" name="kernelSizeSpin">
+               <widget class="QSpinBox" name="spacialSizeSpin">
                 <property name="geometry">
                  <rect>
                   <x>142</x>
@@ -539,7 +594,7 @@
                  <double>0.100000000000000</double>
                 </property>
                </widget>
-               <widget class="QPushButton" name="applyKernelFilter">
+               <widget class="QPushButton" name="applySpacialFilter">
                 <property name="geometry">
                  <rect>
                   <x>10</x>

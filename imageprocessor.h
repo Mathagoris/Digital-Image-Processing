@@ -30,7 +30,9 @@ private slots:
 
     void on_applyColorBin_clicked();
 
-    void on_applyKernelFilter_clicked();
+    void on_applySpacialFilter_clicked();
+
+    void on_applyBitPlane_clicked();
 
 private:
     void display(QImage origIm, QImage procIm);
@@ -48,10 +50,22 @@ private:
     int colorBin(int value, int bitness);
 
     //kernel filtering
-    int** createKernel(QString method, int dim, double highBoostConst = NULL);
-    QImage convolve(QImage im, int** kernel, int dim);
+    std::vector<std::vector<double> > createKernelSmoothing(int dim);
+    std::vector<std::vector<double> > createKernelLaplacian(int dim);
+    double laplacianOfGaussian(int x, int y, int dim);
+    QImage convolve(QImage im, std::vector<std::vector<double> > kernel);
+    QImage convolveMedian(QImage im, int dim);
+    QImage convolveLoG(QImage im, std::vector<std::vector<double> > kernel);
+    int getMedian(std::vector<int> &vals);
     QImage padImage(QImage im, int padding);
     QImage removePadding(QImage padded, int padding);
+    QImage highboost(QImage im, int dim, double k);
+
+    //bitplane
+    QImage removeBitPlane(QImage im, int plane);
+
+    //misc
+    QImage sub(QImage im1, QImage im2);
 
     QImage m_origIm;
     QImage m_procIm;

@@ -4,6 +4,17 @@
 #include <algorithm>
 #include <math.h>
 #include <qdebug.h>
+#include <vector>
+#include <limits>
+
+const unsigned char bit0 = 0b00000001;
+const unsigned char bit1 = 0b00000010;
+const unsigned char bit2 = 0b00000100;
+const unsigned char bit3 = 0b00001000;
+const unsigned char bit4 = 0b00010000;
+const unsigned char bit5 = 0b00100000;
+const unsigned char bit6 = 0b01000000;
+const unsigned char bit7 = 0b10000000;
 
 ImageProcessor::ImageProcessor(QWidget *parent) :
     QMainWindow(parent),
@@ -16,6 +27,7 @@ ImageProcessor::ImageProcessor(QWidget *parent) :
     ui->imageLabel->setScaledContents(true);
     ui->imageScrollArea->setBackgroundRole(QPalette::Dark);
     ui->imageScrollArea->setWidgetResizable(true);
+    //ui->processScrollArea->verticalScrollBar();
 
 //    QString filename = "/home/mathius/Documents/CS555/DigitalImageProcessing/images/climb.jpg";
 //    m_origIm.load(filename);
@@ -48,6 +60,7 @@ void ImageProcessor::on_actionOpen_Image_triggered()
     resetUI();
     ui->processScrollArea->setEnabled(true);
     if(!m_origIm.isGrayscale()) ui->convertToGray->setEnabled(true);
+    else m_origIm.convertToFormat(QImage::Format_RGB32);
     ui->mainLabel->setText(tr("Process Image:"));
 }
 
@@ -244,7 +257,6 @@ int ImageProcessor::colorBin(int value, int bitness)
 
 }
 
-
 QImage ImageProcessor::padImage(QImage im, int padding)
 {
     QImage padded(im.width()+(2*padding), im.height()+(2*padding), im.format());
@@ -267,7 +279,7 @@ QImage ImageProcessor::padImage(QImage im, int padding)
     }
     // Pad left and right edge
     for(int i = 0; i < padding; ++i){
-        for(j = 0; j < im.height(); ++j){
+        for(int j = 0; j < im.height(); ++j){
             padded.setPixel(i,padding + j, im.pixel(0,j));
             padded.setPixel(padded.width()-1-i, padding + j, im.pixel(im.width()-1,j));
         }
@@ -275,7 +287,7 @@ QImage ImageProcessor::padImage(QImage im, int padding)
     // Fill middle
     for(int i = 0; i < im.width(); ++i){
         for(int j = 0; j < im.height(); ++j){
-            padded(padding+i,padding+j, im.pixel(i,j));
+            padded.setPixel(padding+i,padding+j, im.pixel(i,j));
         }
     }
     return padded;
@@ -292,30 +304,258 @@ QImage ImageProcessor::removePadding(QImage padded, int padding)
     return unpadded;
 }
 
-
-int** ImageProcessor::createKernel(QString method, int dim, double highBoostConst)
+QImage ImageProcessor::highboost(QImage im, int dim, double k)
 {
-    int** kernel;
-    kernel = new int*[dim];
+    std::vector<std::vector<double> > kernel = createKernelSmoothing(dim);
+    QImage smooth = convolve(im, kernel);
+    QImage mask = sub(im, smooth);
+    QImage procIm(im.width(), im.height(), im.format());
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < im.height(); ++j){
+            QColor newColor;
+            newColor.setRed(std::min(int(QColor(im.pixel(i,j)).red() +
+                                     k * QColor(mask.pixel(i,j)).red()), 255));
+            newColor.setGreen(std::min(int(QColor(im.pixel(i,j)).green() +
+                                     k * QColor(mask.pixel(i,j)).green()), 255));
+            newColor.setBlue(std::min(int(QColor(im.pixel(i,j)).blue() +
+                                     k * QColor(mask.pixel(i,j)).blue()), 255));
+            procIm.setPixel(i,j,newColor.rgb());
+        }
+    }
+    return procIm;
+}
+
+QImage ImageProcessor::removeBitPlane(QImage im, int plane)
+{
+    QImage procIm(im.width(), im.height(), im.format());
+    int bit;
+    switch (plane) {
+    case 0:
+        bit = bit0;
+        break;
+    case 1:
+        bit = bit1;
+        break;
+    case 2:
+        bit = bit2;
+        break;
+    case 3:
+        bit = bit3;
+        break;
+    case 4:
+        bit = bit4;
+        break;
+    case 5:
+        bit = bit5;
+        break;
+    case 6:
+        bit = bit6;
+        break;
+    default:
+        bit = bit7;
+        break;
+    }
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < im.height(); ++j){
+            QColor newColor;
+            newColor.setRed(QColor(im.pixel(i,j)).red() & ~bit);
+            newColor.setGreen(QColor(im.pixel(i,j)).green() & ~bit);
+            newColor.setBlue(QColor(im.pixel(i,j)).blue() & ~bit);
+            procIm.setPixel(i,j,newColor.rgb());
+        }
+    }
+    return procIm;
+}
+
+QImage ImageProcessor::sub(QImage im1, QImage im2)
+{
+    QImage procIm(im1.width(), im1.height(), im1.format());
+    for(int i = 0; i < im1.width(); ++i){
+        for(int j = 0; j < im1.height(); ++j){
+            QColor newColor;
+            newColor.setRed(std::max(QColor(im1.pixel(i,j)).red() -
+                                     QColor(im2.pixel(i,j)).red(),0));
+            newColor.setGreen(std::max(QColor(im1.pixel(i,j)).green() -
+                                     QColor(im2.pixel(i,j)).green(),0));
+            newColor.setBlue(std::max(QColor(im1.pixel(i,j)).blue() -
+                                     QColor(im2.pixel(i,j)).blue(),0));
+            procIm.setPixel(i,j,newColor.rgb());
+        }
+    }
+    return procIm;
+}
+
+// potentially change to gaussian blur... -___-
+std::vector<std::vector<double> > ImageProcessor::createKernelSmoothing(int dim)
+{
+    std::vector<std::vector<double> > kernel(dim, std::vector<double>(dim));
+    for(int i = 0; i < dim; ++i){
+        for(int j = 0; j < dim; ++j){
+            kernel[i][j] = 1.0/(dim*dim);
+        }
+    }
     return kernel;
 }
 
-QImage ImageProcessor::convolve(QImage im, int **kernel, int dim)
+std::vector<std::vector<double> > ImageProcessor::createKernelLaplacian(int dim)
 {
-    int padding = dim/2;
+    std::vector<std::vector<double> > kernel(dim, std::vector<double>(dim));
     int kernelMid = dim/2;
-    QImage padded = padImage(im, padding);
-    QImage procIm(im.width(), im.height(), im.format());
-    for(int i = 0; i < procIm.width(), ++i){
-        for(int j = 0; j < procIm.height(). ++j){
-            double sum = 0;
-            for(int x = -padding; x <= padding; ++x){
-                for(int y = -padding; y <= padding; ++y){
-                    sum +=
-                }
-            }
+    for(int i = -kernelMid; i <= kernelMid; ++i){
+        for(int j = -kernelMid; j <= kernelMid; ++j){
+            double lap = laplacianOfGaussian(i,j,dim);
+            kernel[i+kernelMid][j+kernelMid] = lap;
         }
     }
+    return kernel;
+}
+
+double ImageProcessor::laplacianOfGaussian(int x, int y, int dim)
+{
+    double sigma = dim/2;
+    sigma /= 2.0;
+    const double PI = 3.141592653589793;
+    double g = 0;
+    for(double ySubPixel = y - 0.5; ySubPixel < y + 0.55; ySubPixel += 0.1){
+        for(double xSubPixel = x - 0.5; xSubPixel < x + 0.55; xSubPixel += 0.1){
+            double s = -((xSubPixel*xSubPixel)+(ySubPixel*ySubPixel))/
+                (2*sigma*sigma);
+            g = g + (1/(PI*pow(sigma,4)))*
+                (1+s)*exp(s);
+        }
+    }
+    g = -g/121;
+    return g;
+}
+
+QImage ImageProcessor::convolve(QImage im, std::vector<std::vector<double> > kernel)
+{
+    int padding = kernel.size()/2;
+    int kernelMid = kernel.size()/2;
+    QImage padded = padImage(im, padding);
+    QImage procIm(im.width(), im.height(), im.format());
+    for(int i = 0; i < procIm.width(); ++i){
+        for(int j = 0; j < procIm.height(); ++j){
+            double redSum = 0;
+            double greenSum = 0;
+            double blueSum = 0;
+            for(int x = -padding; x <= padding; ++x){
+                for(int y = -padding; y <= padding; ++y){
+                    redSum += QColor(padded.pixel(padding+i+x,padding+j+y)).red() * kernel[kernelMid+x][kernelMid+y];
+                    greenSum += QColor(padded.pixel(padding+i+x,padding+j+y)).green() * kernel[kernelMid+x][kernelMid+y];
+                    blueSum += QColor(padded.pixel(padding+i+x,padding+j+y)).blue() * kernel[kernelMid+x][kernelMid+y];
+                }
+            }
+            procIm.setPixel(i,j,QColor(redSum, greenSum, blueSum).rgb());
+        }
+    }
+    return procIm;
+}
+
+// TO-DO: Median filter for color image is very subtle
+QImage ImageProcessor::convolveMedian(QImage im, int dim)
+{
+    int padding = dim/2;
+    QImage padded = padImage(im, padding);
+    QImage procIm(im.width(), im.height(), im.format());
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < im.height(); ++j){
+            std::vector<int> vals(dim*dim);
+            for(int x = -padding; x <= padding; ++x){
+                for(int y = -padding; y <= padding; ++y){
+                    // if its a color image we need to find the median of the
+                    // hue not the median of RGB
+                    if(im.format() == QImage::Format_RGB32){
+                        vals[dim * (x + padding) + (y + padding)] =
+                                QColor(padded.pixel(padding+i+x,padding+j+y)).toHsv().hue();
+                    } else {
+                        vals[dim * (x + padding) + (y+ padding)] =
+                                QColor(padded.pixel(padding+i+x,padding+j+y)).red();
+                    }
+                }
+            }
+            int median = getMedian(vals);
+            QColor pix = QColor(padded.pixel(padding+i,padding+j));
+            // if its a color image we need to find the median of the
+            // hue not the median of RGB
+            if(im.format() == QImage::Format_RGB32) {
+                pix = pix.toHsv();
+                pix.setHsv(median, pix.saturation(), pix.value());
+                pix = pix.toRgb();
+            }
+            else
+                pix.setRgb(median, median, median);
+            procIm.setPixel(i,j,pix.rgb());
+        }
+    }
+    return procIm;
+}
+
+// TO-DO: Not scaling properly
+QImage ImageProcessor::convolveLoG(QImage im, std::vector<std::vector<double> > kernel)
+{
+    int padding = kernel.size()/2;
+    int kernelMid = kernel.size()/2;
+    QImage padded = padImage(im, padding);
+    QImage procIm(im.width(), im.height(), im.format());
+    std::vector<std::vector<std::vector<double> > >
+            tempIm(im.width(),
+                   std::vector<std::vector<double> >(im.height(),
+                                                  std::vector<double>(3,0.0)));
+    double rMax = std::numeric_limits<double>::min();
+    double rMin = std::numeric_limits<double>::max();
+    double gMax = std::numeric_limits<double>::min();
+    double gMin = std::numeric_limits<double>::max();
+    double bMax = std::numeric_limits<double>::min();
+    double bMin = std::numeric_limits<double>::max();
+    for(int i = 0; i < procIm.width(); ++i){
+        for(int j = 0; j < procIm.height(); ++j){
+            double redSum = 0;
+            double greenSum = 0;
+            double blueSum = 0;
+            for(int x = -padding; x <= padding; ++x){
+                for(int y = -padding; y <= padding; ++y){
+                    redSum += QColor(padded.pixel(padding+i+x,padding+j+y)).red() * kernel[kernelMid+x][kernelMid+y];
+                    greenSum += QColor(padded.pixel(padding+i+x,padding+j+y)).green() * kernel[kernelMid+x][kernelMid+y];
+                    blueSum += QColor(padded.pixel(padding+i+x,padding+j+y)).blue() * kernel[kernelMid+x][kernelMid+y];
+                }
+            }
+            tempIm[i][j][0] = redSum;
+            tempIm[i][j][1] = greenSum;
+            tempIm[i][j][2] = blueSum;
+            if(redSum < rMin) rMin = redSum;
+            if(redSum > rMax) rMax = redSum;
+            if(greenSum < gMin) gMin = greenSum;
+            if(greenSum > gMax) gMax = greenSum;
+            if(blueSum < bMin) bMin = blueSum;
+            if(blueSum > bMax) bMax = blueSum;
+        }
+    }
+    double rNorm = 255.0/(rMax - rMin);
+    double gNorm = 255.0/(gMax - gMin);
+    double bNorm = 255.0/(bMax - bMin);
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < im.height(); ++j){
+            int newRed = std::max(int(QColor(im.pixel(i,j)).red() -
+                    round((tempIm[i][j][0] - rMin)*rNorm)), 0);
+            int newGreen = std::max(int(QColor(im.pixel(i,j)).green() -
+                    round((tempIm[i][j][1] - gMin)*gNorm)), 0);
+            int newBlue = std::max(int(QColor(im.pixel(i,j)).blue() -
+                    round((tempIm[i][j][2] - bMin)*bNorm)), 0);
+//            int newRed = round((tempIm[i][j][0] - rMin)*rNorm);
+//            int newGreen = round((tempIm[i][j][1] - gMin)*gNorm);
+//            int newBlue = round((tempIm[i][j][2] - bMin)*bNorm);
+            procIm.setPixel(i,j,QColor(newRed, newGreen, newBlue).rgb());
+        }
+    }
+    return procIm;
+}
+
+int ImageProcessor::getMedian(std::vector<int> &vals)
+{
+    size_t n = vals.size() / 2;
+    std::nth_element(vals.begin(), vals.begin()+n, vals.end());
+    return vals[n];
 }
 
 
@@ -397,15 +637,36 @@ void ImageProcessor::on_applyColorBin_clicked()
     }
 }
 
-void ImageProcessor::on_applyKernelFilter_clicked()
+
+void ImageProcessor::on_applySpacialFilter_clicked()
 {
-    if(QString::compare(ui->kernelFilterComboBox->currentText(), tr("High-Boost"))){
-        QImage kernel = createKernel(ui->kernelFilterComboBox->currentText(), ui->kernelSizeSpin->value(),
-                                     ui->hbConstSpin->value());
-    } else {
-        QImage kernel = createKernel(ui->kernelFilterComboBox->currentText(), ui->kernelSizeSpin->value());
+    if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                        tr("Smoothing")) == 0){
+        int dim = ui->spacialSizeSpin->value();
+        std::vector<std::vector<double> > kernel = createKernelSmoothing(dim);
+        m_procIm = convolve(m_origIm, kernel);
+    } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Median")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = convolveMedian(m_origIm, dim);
+    } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Sharpening Laplacian")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        std::vector<std::vector<double> > kernel = createKernelLaplacian(dim);
+        m_procIm = convolveLoG(m_origIm, kernel);
+    } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("High-Boost")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        int k = ui->hbConstSpin->value();
+        m_procIm = highboost(m_origIm, dim, k);
     }
-    m_procIm = convolve(m_origIm, kernel);
+    display(m_origIm, m_procIm);
+    on_image_process();
+}
+
+void ImageProcessor::on_applyBitPlane_clicked()
+{
+    m_procIm = removeBitPlane(m_origIm, ui->bitPlane->value());
     display(m_origIm, m_procIm);
     on_image_process();
 }
