@@ -34,38 +34,15 @@ private slots:
 
     void on_applyBitPlane_clicked();
 
+    void on_spacialSizeSpin_valueChanged(const QString &arg1);
+
+    void on_histEqualButton_clicked();
+
 private:
     void display(QImage origIm, QImage procIm);
     void resetUI();
     void on_image_process();
-
-    //image resize
     QImage upsample(QImage im, QString method, double xFactor, double yFactor);
-    QImage nearestNeighbor(QImage im, double xFactor, double yFactor);
-    QImage linear(QImage im, double xFactor, double yFactor, bool inXDir = true);
-    QImage bilinear(QImage im, double xFactor, double yFactor);
-
-    //color resolution
-    QImage colorBin(QImage im, int bitness);
-    int colorBin(int value, int bitness);
-
-    //kernel filtering
-    std::vector<std::vector<double> > createKernelSmoothing(int dim);
-    std::vector<std::vector<double> > createKernelLaplacian(int dim);
-    double laplacianOfGaussian(int x, int y, int dim);
-    QImage convolve(QImage im, std::vector<std::vector<double> > kernel);
-    QImage convolveMedian(QImage im, int dim);
-    QImage convolveLoG(QImage im, std::vector<std::vector<double> > kernel);
-    int getMedian(std::vector<int> &vals);
-    QImage padImage(QImage im, int padding);
-    QImage removePadding(QImage padded, int padding);
-    QImage highboost(QImage im, int dim, double k);
-
-    //bitplane
-    QImage removeBitPlane(QImage im, int plane);
-
-    //misc
-    QImage sub(QImage im1, QImage im2);
 
     QImage m_origIm;
     QImage m_procIm;

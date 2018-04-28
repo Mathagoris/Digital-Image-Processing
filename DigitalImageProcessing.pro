@@ -25,10 +25,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
         main.cpp \
-    imageprocessor.cpp
+    imageprocessor.cpp \
+    imageprocess.cpp
 
 HEADERS += \
-    imageprocessor.h
+    imageprocessor.h \
+    hashcounter.h \
+    imageprocess.h
 
 FORMS += \
     imageprocessor.ui
