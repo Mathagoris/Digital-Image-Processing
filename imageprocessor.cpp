@@ -3,6 +3,7 @@
 #include "imageprocess.h"
 #include <QFileDialog>
 #include <qdebug.h>
+#include <memory>
 
 ImageProcessor::ImageProcessor(QWidget *parent) :
     QMainWindow(parent),
@@ -17,10 +18,12 @@ ImageProcessor::ImageProcessor(QWidget *parent) :
     ui->imageScrollArea->setWidgetResizable(true);
     ui->processScrollAreaContents->resize(ui->processScrollAreaContents->size());
 
-//    QString filename = "/home/mathius/Documents/CS555/DigitalImageProcessing/images/climb.jpg";
-//    m_origIm.load(filename);
+    m_origIm = std::make_unique<QImage>();
 
-//    m_origIm.convertToFormat(QImage::Format_Grayscale8);
+//    QString filename = "/home/mathius/Documents/CS555/DigitalImageProcessing/images/climb.jpg";
+//    m_origIm->load(filename);
+
+//    m_origIm->convertToFormat(QImage::Format_Grayscale8);
 //    ui->imageLabel->setPixmap(QPixmap::fromImage(m_origIm));
 }
 
@@ -36,55 +39,37 @@ void ImageProcessor::on_actionOpen_Image_triggered()
                        "",
                        tr("Image Files (*.png *.jpg *.bmp)"));
     if(QString::compare(filename, "") != 0){
-        m_origIm.load(filename);
+        m_origIm->load(filename);
         resetUI();
         ui->processScrollArea->setEnabled(true);
         ui->bitPlaneZero->setEnabled(true);
-        if(!m_origIm.isGrayscale()){
+        if(!m_origIm->isGrayscale()){
             ui->convertToGray->setEnabled(true);
-            m_origIm = m_origIm.convertToFormat(QImage::Format_RGB32);
+            m_origIm = std::make_unique<QImage>(m_origIm->convertToFormat(QImage::Format_RGB32));
         } else
-            m_origIm = m_origIm.convertToFormat(QImage::Format_Grayscale8);
+            m_origIm = std::make_unique<QImage>(m_origIm->convertToFormat(QImage::Format_Grayscale8));
         ui->mainLabel->setText(tr("Process Image:"));
     }
 }
 
-void ImageProcessor::display(QImage origIm, QImage procIm)
+void ImageProcessor::display(std::unique_ptr<QImage> &origIm, std::unique_ptr<QImage> &procIm)
 {
-    QImage dispIm(origIm.width() + procIm.width(), std::max(origIm.height(), procIm.height()), origIm.format());
+    std::unique_ptr<QImage> dispIm = std::make_unique<QImage>(origIm->width() + procIm->width(),
+                               std::max(origIm->height(), procIm->height()), origIm->format());
 
-    for(int i = 0; i < origIm.width(); i++){
-        for(int j = 0; j < origIm.height(); j++){
-            dispIm.setPixel(i,j, origIm.pixel(i,j));
+    for(int i = 0; i < origIm->width(); i++){
+        for(int j = 0; j < origIm->height(); j++){
+            dispIm->setPixel(i,j, origIm->pixel(i,j));
         }
     }
-    for(int i = 0; i < procIm.width(); i++){
-        for(int j = 0; j < procIm.height(); j++){
-            dispIm.setPixel(i+origIm.width(),j,procIm.pixel(i,j));
+    for(int i = 0; i < procIm->width(); i++){
+        for(int j = 0; j < procIm->height(); j++){
+            dispIm->setPixel(i+origIm->width(),j,procIm->pixel(i,j));
         }
     }
-    ui->imageLabel->setPixmap(QPixmap::fromImage(dispIm));
+    ui->imageLabel->setPixmap(QPixmap::fromImage(*(dispIm.get())));
     ui->imageLabel->adjustSize();
 }
-
-QImage ImageProcessor::upsample(QImage im, QString method, double xFactor, double yFactor)
-{
-    if(QString::compare(method, tr("Nearest Neighbor")) == 0){
-        return ImageProcess::nearestNeighbor(im, xFactor, yFactor);
-    }
-    else if(QString::compare(method, tr("Linear X-Direction")) == 0){
-        return ImageProcess::linear(im, xFactor, yFactor, true);
-    }
-    else if(QString::compare(method, tr("Linear Y-Direction")) == 0){
-        return ImageProcess::linear(im, xFactor, yFactor, false);
-    }
-    else{
-        return ImageProcess::bilinear(im, xFactor, yFactor);
-    }
-}
-
-
-
 
 void ImageProcessor::on_resizeFactor_valueChanged(int arg1)
 {
@@ -99,18 +84,27 @@ void ImageProcessor::on_resizeFactor_valueChanged(int arg1)
 void ImageProcessor::on_applyResize_clicked()
 {
     if(ui->resizeFactor->value() > 100){
-        m_procIm = upsample(m_origIm, ui->upsampleCombo->currentText(),
-                            ui->resizeFactor->value()/100.0,
-                            ui->resizeFactor->value()/100.0);
-        display(m_origIm, m_procIm);
-        on_image_process();
-    }
-    if(ui->resizeFactor->value() < 100){
+        double xFactor = ui->resizeFactor->value()/100.0;
+        double yFactor = ui->resizeFactor->value()/100.0;
+        if(ui->upsampleCombo->currentText() == "Nearest Neighbor") {
+            m_procIm = ImageProcess::nearestNeighbor(m_origIm, xFactor, yFactor);
+        }
+        else if(ui->upsampleCombo->currentText() == "Linear X-Direction") {
+            m_procIm = ImageProcess::linear(m_origIm, xFactor, yFactor, true);
+        }
+        else if(ui->upsampleCombo->currentText() == "Linear Y-Direction") {
+            m_procIm = ImageProcess::linear(m_origIm, xFactor, yFactor, false);
+        }
+        else { // bilinear
+            m_procIm = ImageProcess::bilinear(m_origIm, xFactor, yFactor);
+        }
+    } else if(ui->resizeFactor->value() < 100) {
         m_procIm = ImageProcess::nearestNeighbor(m_origIm, ui->resizeFactor->value()/100.0,
                                              ui->resizeFactor->value()/100.0);
-        display(m_origIm, m_procIm);
-        on_image_process();
-    }
+    } else { return; }
+
+    display(m_origIm, m_procIm);
+    on_image_process();
 }
 
 void ImageProcessor::on_image_process()
@@ -123,32 +117,32 @@ void ImageProcessor::on_image_process()
 void ImageProcessor::on_saveProcImage_clicked()
 {
     QString filename = QFileDialog::getSaveFileName(this, tr("Save Image"),
-                       //"/home/mathius/Documents/CS555/DigitalImageProcessing/images",
-                                                    "",
+                       "/home/mathius/Documents/CS555/DigitalImageProcessing/images",
+                                                    //"",
                        tr("Image Files (*.png *.jpg *.bmp)"));
     if(!filename.endsWith(tr(".jpg"))) filename = filename.append(".jpg");
-    m_procIm.save(filename);
+    m_procIm->save(filename);
 }
 
 void ImageProcessor::on_useProcImage_clicked()
 {
-    m_origIm = m_procIm;
+    m_origIm = std::move(m_procIm);
     resetUI();
 }
 
 void ImageProcessor::on_convertToGray_clicked()
 {
-    m_procIm = m_origIm.convertToFormat(QImage::Format_Grayscale8);
+    m_procIm = std::make_unique<QImage>(m_origIm->convertToFormat(QImage::Format_Grayscale8));
     display(m_origIm, m_procIm);
     on_image_process();
 }
 
 void ImageProcessor::resetUI()
 {
-    ui->imageLabel->setPixmap(QPixmap::fromImage(m_origIm));
+    ui->imageLabel->setPixmap(QPixmap::fromImage(*(m_origIm.get())));
     ui->imageLabel->adjustSize();
     m_isImageProcessed = false;
-    if(m_origIm.isGrayscale()){
+    if(m_origIm->isGrayscale()){
         ui->convertToGray->setEnabled(false);
     }
     ui->saveProcImage->setEnabled(false);
@@ -210,7 +204,6 @@ void ImageProcessor::on_spacialSizeSpin_valueChanged(const QString &arg1)
 
 void ImageProcessor::on_histEqualButton_clicked()
 {
-    delete m_procIm;
     m_procIm = ImageProcess::globalHistEqualization(m_origIm);
     display(m_origIm,m_procIm);
     on_image_process();

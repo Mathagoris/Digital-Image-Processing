@@ -2,6 +2,7 @@
 #define IMAGEPROCESSOR_H
 
 #include <QMainWindow>
+#include <memory>
 
 namespace Ui {
 class ImageProcessor;
@@ -39,13 +40,12 @@ private slots:
     void on_histEqualButton_clicked();
 
 private:
-    void display(QImage origIm, QImage procIm);
+    void display(std::unique_ptr<QImage> &origIm, std::unique_ptr<QImage> &procIm);
     void resetUI();
     void on_image_process();
-    QImage upsample(QImage im, QString method, double xFactor, double yFactor);
 
-    QImage m_origIm;
-    QImage m_procIm;
+    std::unique_ptr<QImage> m_origIm;
+    std::unique_ptr<QImage> m_procIm;
 
     bool m_isImageProcessed = false;
 

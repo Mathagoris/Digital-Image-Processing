@@ -6,23 +6,23 @@
 class HashCounter
 {
 public:
-    HashCounter() { map = std::map<int, int>(); }
+    HashCounter() { m_map = std::map<int, int>(); }
     void increment(int key){
-        if(map.find(key) == map.end()) {
-            map[key] = 0;
+        if(m_map.find(key) == m_map.end()) {
+            m_map[key] = 0;
         } else {
-            map[key] = map[key] + 1;
+            m_map[key] = m_map[key] + 1;
         }
     }
     int operator [](int key){
-        if(map.find(key) == map.end()) {
-            return NULL;
+        if(m_map.find(key) == m_map.end()) {
+            return -1;
         } else {
-            return map[key];
+            return m_map[key];
         }
     }
 private:
-    std::map<int,int> map;
+    std::map<int,int> m_map;
 };
 
 #endif // HASHCOUNTER_H
