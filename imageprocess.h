@@ -30,6 +30,7 @@ namespace ImageProcess
     //histogram equalization
     std::unique_ptr<QImage> globalHistEqualization(const std::unique_ptr<QImage> &im);
     std::unique_ptr<QImage> localHistEqualization(const std::unique_ptr<QImage> &im, int dim);
+    std::map<int,int> getNewHistEqValues(const std::unique_ptr<QImage> &im);
 
     //misc
     std::unique_ptr<QImage> padImage(const std::unique_ptr<QImage> &im, int padding);

@@ -257,7 +257,7 @@ std::unique_ptr<QImage> ImageProcess::convolve(const std::unique_ptr<QImage> &im
     return procIm;
 }
 
-// TO-DO: Median filter for color image is very subtle
+// TODO: Median filter for color image is very subtle
 std::unique_ptr<QImage> ImageProcess::convolveMedian(const std::unique_ptr<QImage> &im, int dim)
 {
     int padding = dim/2;
@@ -296,7 +296,7 @@ std::unique_ptr<QImage> ImageProcess::convolveMedian(const std::unique_ptr<QImag
     return procIm;
 }
 
-// TO-DO: Not scaling properly
+// TODO: Not scaling properly
 std::unique_ptr<QImage> ImageProcess::convolveLoG(const std::unique_ptr<QImage> &im, std::vector<std::vector<double> > kernel)
 {
     int padding = kernel.size()/2;
@@ -439,44 +439,74 @@ std::unique_ptr<QImage> ImageProcess::removeBitPlane(const std::unique_ptr<QImag
 
 std::unique_ptr<QImage> ImageProcess::globalHistEqualization(const std::unique_ptr<QImage> &im)
 {
-//    HashCounter counter();
-//    double numPixel = im->width() * im->height();
-//    for(int i = 0; i < im->width(); ++i){
-//        for(int j = 0; j < im->height(); ++j){
-//            if(im->format() == QImage::Format_RGB32)
-//                counter.increment(QColor(im->pixel(i,j)).toHsv().value());
-//            else
-//                counter.increment(QColor(im->pixel(i,j)).red());
-//        }
-//    }
-//    std::vector<double> prob(256, 0.0);
-//    std::vector<int> newValues(256);
-//    double cumulativeProb = 0.0;
-//    for(int i = 0; i < 256; ++i){
-//        prob[i] = hist[i]/numPixel;
-//        cumulativeProb += prob[i];
-//        newValues[i] = round(cumulativeProb*255);
-//    }
+    std::map<int,int> newValues = getNewHistEqValues(im);
     std::unique_ptr<QImage> procIm = std::make_unique<QImage>(im->width(),im->height(),im->format());
-//    for(int i = 0; i < im->width(); ++i){
-//        for(int j = 0; j < im->height(); ++j){
-//            QColor pix = QColor(im->pixel(i,j));
-//            if(im->format() == QImage::Format_RGB32){
-//                pix = pix.toHsv();
-//                pix.setHsv(pix.hue(), pix.saturation(), newValues[pix.value()]);
-//                pix.toRgb();
-//            } else {
-//                pix.setRgb(newValues[pix.red()],newValues[pix.red()],newValues[pix.red()]);
-//            }
-//            procIm->setPixel(i,j,pix.rgb());
-//        }
-//    }
+    for(int i = 0; i < im->width(); ++i){
+        for(int j = 0; j < im->height(); ++j){
+            QColor pix = QColor(im->pixel(i,j));
+            if(im->format() == QImage::Format_RGB32){
+                pix = pix.toHsv();
+                pix.setHsv(pix.hue(), pix.saturation(), newValues[pix.value()]);
+                pix.toRgb();
+            } else {
+                pix.setRgb(newValues[pix.red()],newValues[pix.red()],newValues[pix.red()]);
+            }
+            procIm->setPixel(i,j,pix.rgb());
+        }
+    }
     return procIm;
 }
 
+// TODO: maybe change all kernels to work as image
 std::unique_ptr<QImage> ImageProcess::localHistEqualization(const std::unique_ptr<QImage> &im, int dim)
 {
+    int padding = dim/2;
+    std::unique_ptr<QImage> padded = padImage(im, padding);
+    std::unique_ptr<QImage> procIm = std::make_unique<QImage>(im->width(),im->height(),im->format());
+    for(int i = 0; i < im->width(); ++i){
+        for(int j = 0; j < im->height(); ++j){
+            std::unique_ptr<QImage> kernel = std::make_unique<QImage>(dim,dim,im->format());
+            for(int x = -padding; x <= padding; ++x){
+                for(int y = -padding; y <= padding; ++y){
+                    kernel->setPixel(padding+x,padding+y, padded->pixel(i+x,j+y));
+                }
+            }
+            std::map<int,int> newValues = getNewHistEqValues(kernel);
+            QColor pix = QColor(im->pixel(i,j));
+            if(im->format() == QImage::Format_RGB32){
+                pix = pix.toHsv();
+                pix.setHsv(pix.hue(), pix.saturation(), newValues[pix.value()]);
+                pix.toRgb();
+            } else {
+                pix.setRgb(newValues[pix.red()],newValues[pix.red()],newValues[pix.red()]);
+            }
+            procIm->setPixel(i,j,pix.rgb());
+        }
+    }
+    return procIm;
+}
 
+std::map<int,int> ImageProcess::getNewHistEqValues(const std::unique_ptr<QImage> &im)
+{
+    HashCounter<int> counter;
+    double numPixel = im->width() * im->height();
+    for(int i = 0; i < im->width(); ++i){
+        for(int j = 0; j < im->height(); ++j){
+            if(im->format() == QImage::Format_RGB32)
+                counter.increment(QColor(im->pixel(i,j)).toHsv().value());
+            else
+                counter.increment(QColor(im->pixel(i,j)).red());
+        }
+    }
+    std::vector<double> prob;
+    std::map<int, int> newValues;
+    double cumulativeProb = 0.0;
+    for(std::map<int,int>::iterator it = counter.begin(); it != counter.end(); ++it){
+        prob.push_back(it->second/numPixel);
+        cumulativeProb += prob[prob.size()-1];
+        newValues[it->first] = round(cumulativeProb*255);
+    }
+    return newValues;
 }
 
 // ==== MISC ======================================================================================
