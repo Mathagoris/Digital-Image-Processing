@@ -40,7 +40,7 @@ private slots:
     void on_histEqualButton_clicked();
 
 private:
-    void display(std::unique_ptr<QImage> &origIm, std::unique_ptr<QImage> &procIm);
+    void display(const std::unique_ptr<QImage> &origIm, const std::unique_ptr<QImage> &procIm);
     void resetUI();
     void on_image_process();
 

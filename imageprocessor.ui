@@ -368,11 +368,6 @@
                 </item>
                 <item>
                  <property name="text">
-                  <string>Median</string>
-                 </property>
-                </item>
-                <item>
-                 <property name="text">
                   <string>Sharpening Laplacian</string>
                  </property>
                 </item>
@@ -384,6 +379,51 @@
                 <item>
                  <property name="text">
                   <string>Histogram Equalization</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Median</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Max</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Min</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Arithmetic Mean</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Geometric Mean</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Harmonic Mean</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Contraharmonic Mean</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Midpoint</string>
+                 </property>
+                </item>
+                <item>
+                 <property name="text">
+                  <string>Alpha-Trimmed Mean</string>
                  </property>
                 </item>
                </widget>

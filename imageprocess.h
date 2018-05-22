@@ -7,36 +7,50 @@
 namespace ImageProcess
 {
     //image resize
-    std::unique_ptr<QImage> nearestNeighbor(const std::unique_ptr<QImage> &im, double xFactor, double yFactor);
-    std::unique_ptr<QImage> linear(const std::unique_ptr<QImage> &im, double xFactor, double yFactor, bool inXDir = true);
-    std::unique_ptr<QImage> bilinear(const std::unique_ptr<QImage> &im, double xFactor, double yFactor);
+    QImage nearestNeighbor(const QImage &im, double xFactor, double yFactor);
+    QImage linear(const QImage &im, double xFactor, double yFactor, bool inXDir = true);
+    QImage bilinear(const QImage &im, double xFactor, double yFactor);
 
     //color resolution
-    std::unique_ptr<QImage> colorBin(const std::unique_ptr<QImage> &im, int bitness);
+    QImage colorBin(const QImage &im, int bitness);
     int colorBin(int value, int bitness);
 
     //spatial filtering
     std::vector<std::vector<double> > createKernelSmoothing(int dim);
     double laplacianOfGaussian(int x, int y, int dim);
     std::vector<std::vector<double> > createKernelLaplacian(int dim);
-    std::unique_ptr<QImage> convolve(const std::unique_ptr<QImage> &im, std::vector<std::vector<double> > kernel);
-    std::unique_ptr<QImage> convolveMedian(const std::unique_ptr<QImage> &im, int dim);
-    std::unique_ptr<QImage> convolveLoG(const std::unique_ptr<QImage> &im, std::vector<std::vector<double> > kernel);
-    std::unique_ptr<QImage> highboost(const std::unique_ptr<QImage> &im, int dim, double k);
+    QImage convolve(const QImage &im, std::vector<std::vector<double> > kernel);
+    QImage convolveLoG(const QImage &im, std::vector<std::vector<double> > kernel);
+    QImage highboost(const QImage &im, int dim, double k);
+
+    //image restoration
+    QImage convolveHSV(const QImage &im, const std::vector<int> *kernel,
+                       const int dim, const double c,
+           int (*conv)(std::vector<int> &vals, const std::vector<int> *kernel,
+                       const int dim, const double c));
+    int medianConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int maxConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int minConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int ameanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int gmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int hmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int chmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int midpointConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+    int atmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c);
+
 
     //bit plane
-    std::unique_ptr<QImage> removeBitPlane(const std::unique_ptr<QImage> &im, int plane, bool zeroOut);
+    QImage removeBitPlane(const QImage &im, int plane, bool zeroOut);
 
     //histogram equalization
-    std::unique_ptr<QImage> globalHistEqualization(const std::unique_ptr<QImage> &im);
-    std::unique_ptr<QImage> localHistEqualization(const std::unique_ptr<QImage> &im, int dim);
-    std::map<int,int> getNewHistEqValues(const std::unique_ptr<QImage> &im);
+    QImage globalHistEqualization(const QImage &im);
+    QImage localHistEqualization(const QImage &im, int dim);
+    std::map<int,int> getNewHistEqValues(const QImage &im);
 
     //misc
-    std::unique_ptr<QImage> padImage(const std::unique_ptr<QImage> &im, int padding);
-    std::unique_ptr<QImage> removePadding(const std::unique_ptr<QImage> &padded, int padding);
-    std::unique_ptr<QImage> sub(const std::unique_ptr<QImage> &im1, const std::unique_ptr<QImage> &im2);
-    int getMedian(std::vector<int> &vals);
+    QImage padImage(const QImage &im, int padding);
+    QImage removePadding(const QImage &padded, int padding);
+    QImage sub(const QImage &im1, const QImage &im2);
 }
 
 #endif // IMAGEPROCESS_H

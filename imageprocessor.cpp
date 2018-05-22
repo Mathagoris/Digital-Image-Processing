@@ -52,22 +52,22 @@ void ImageProcessor::on_actionOpen_Image_triggered()
     }
 }
 
-void ImageProcessor::display(std::unique_ptr<QImage> &origIm, std::unique_ptr<QImage> &procIm)
+void ImageProcessor::display(const std::unique_ptr<QImage> &origIm, const std::unique_ptr<QImage> &procIm)
 {
-    std::unique_ptr<QImage> dispIm = std::make_unique<QImage>(origIm->width() + procIm->width(),
+    QImage dispIm = QImage(origIm->width() + procIm->width(),
                                std::max(origIm->height(), procIm->height()), origIm->format());
 
     for(int i = 0; i < origIm->width(); i++){
         for(int j = 0; j < origIm->height(); j++){
-            dispIm->setPixel(i,j, origIm->pixel(i,j));
+            dispIm.setPixel(i,j, origIm->pixel(i,j));
         }
     }
     for(int i = 0; i < procIm->width(); i++){
         for(int j = 0; j < procIm->height(); j++){
-            dispIm->setPixel(i+origIm->width(),j,procIm->pixel(i,j));
+            dispIm.setPixel(i+origIm->width(),j,procIm->pixel(i,j));
         }
     }
-    ui->imageLabel->setPixmap(QPixmap::fromImage(*(dispIm.get())));
+    ui->imageLabel->setPixmap(QPixmap::fromImage(dispIm));
     ui->imageLabel->adjustSize();
 }
 
@@ -87,20 +87,20 @@ void ImageProcessor::on_applyResize_clicked()
         double xFactor = ui->resizeFactor->value()/100.0;
         double yFactor = ui->resizeFactor->value()/100.0;
         if(ui->upsampleCombo->currentText() == "Nearest Neighbor") {
-            m_procIm = ImageProcess::nearestNeighbor(m_origIm, xFactor, yFactor);
+            m_procIm = std::make_unique<QImage>(ImageProcess::nearestNeighbor(*(m_origIm.get()), xFactor, yFactor));
         }
         else if(ui->upsampleCombo->currentText() == "Linear X-Direction") {
-            m_procIm = ImageProcess::linear(m_origIm, xFactor, yFactor, true);
+            m_procIm = std::make_unique<QImage>(ImageProcess::linear(*(m_origIm.get()), xFactor, yFactor, true));
         }
         else if(ui->upsampleCombo->currentText() == "Linear Y-Direction") {
-            m_procIm = ImageProcess::linear(m_origIm, xFactor, yFactor, false);
+            m_procIm = std::make_unique<QImage>(ImageProcess::linear(*(m_origIm.get()), xFactor, yFactor, false));
         }
         else { // bilinear
-            m_procIm = ImageProcess::bilinear(m_origIm, xFactor, yFactor);
+            m_procIm = std::make_unique<QImage>(ImageProcess::bilinear(*(m_origIm.get()), xFactor, yFactor));
         }
     } else if(ui->resizeFactor->value() < 100) {
-        m_procIm = ImageProcess::nearestNeighbor(m_origIm, ui->resizeFactor->value()/100.0,
-                                             ui->resizeFactor->value()/100.0);
+        m_procIm = std::make_unique<QImage>(ImageProcess::nearestNeighbor(*(m_origIm.get()), ui->resizeFactor->value()/100.0,
+                                             ui->resizeFactor->value()/100.0));
     } else { return; }
 
     display(m_origIm, m_procIm);
@@ -153,7 +153,7 @@ void ImageProcessor::resetUI()
 void ImageProcessor::on_applyColorBin_clicked()
 {
     if(ui->bitness->value() < 8){
-        m_procIm = ImageProcess::colorBin(m_origIm, ui->bitness->value());
+        m_procIm = std::make_unique<QImage>(ImageProcess::colorBin(*(m_origIm.get()), ui->bitness->value()));
         display(m_origIm, m_procIm);
         on_image_process();
     }
@@ -166,25 +166,26 @@ void ImageProcessor::on_applySpacialFilter_clicked()
                         tr("Smoothing")) == 0){
         int dim = ui->spacialSizeSpin->value();
         std::vector<std::vector<double> > kernel = ImageProcess::createKernelSmoothing(dim);
-        m_procIm = ImageProcess::convolve(m_origIm, kernel);
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolve(*(m_origIm.get()), kernel));
     } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
                                tr("Median")) == 0) {
         int dim = ui->spacialSizeSpin->value();
-        m_procIm = ImageProcess::convolveMedian(m_origIm, dim);
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::medianConv));
     } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
                                tr("Sharpening Laplacian")) == 0) {
         int dim = ui->spacialSizeSpin->value();
         std::vector<std::vector<double> > kernel = ImageProcess::createKernelLaplacian(dim);
-        m_procIm = ImageProcess::convolveLoG(m_origIm, kernel);
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveLoG(*(m_origIm.get()), kernel));
     } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
                                tr("High-Boost")) == 0) {
         int dim = ui->spacialSizeSpin->value();
         int k = ui->hbConstSpin->value();
-        m_procIm = ImageProcess::highboost(m_origIm, dim, k);
+        m_procIm = std::make_unique<QImage>(ImageProcess::highboost(*(m_origIm.get()), dim, k));
     } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
                                tr("Histogram Equalization")) == 0) {
         int dim = ui->spacialSizeSpin->value();
-        m_procIm = ImageProcess::localHistEqualization(m_origIm, dim);
+        m_procIm = std::make_unique<QImage>(ImageProcess::localHistEqualization(*(m_origIm.get()), dim));
     }
     display(m_origIm, m_procIm);
     on_image_process();
@@ -192,7 +193,8 @@ void ImageProcessor::on_applySpacialFilter_clicked()
 
 void ImageProcessor::on_applyBitPlane_clicked()
 {
-    m_procIm = ImageProcess::removeBitPlane(m_origIm, ui->bitPlane->value(), ui->bitPlaneZero->isChecked());
+    m_procIm = std::make_unique<QImage>(
+                ImageProcess::removeBitPlane(*(m_origIm.get()), ui->bitPlane->value(), ui->bitPlaneZero->isChecked()));
     display(m_origIm, m_procIm);
     on_image_process();
 }
@@ -204,7 +206,7 @@ void ImageProcessor::on_spacialSizeSpin_valueChanged(const QString &arg1)
 
 void ImageProcessor::on_histEqualButton_clicked()
 {
-    m_procIm = ImageProcess::globalHistEqualization(m_origIm);
+    m_procIm = std::make_unique<QImage>(ImageProcess::globalHistEqualization(*(m_origIm.get())));
     display(m_origIm,m_procIm);
     on_image_process();
 }
