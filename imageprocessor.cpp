@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <qdebug.h>
 #include <memory>
+#include <QMessageBox>
 
 ImageProcessor::ImageProcessor(QWidget *parent) :
     QMainWindow(parent),
@@ -162,30 +163,109 @@ void ImageProcessor::on_applyColorBin_clicked()
 
 void ImageProcessor::on_applySpacialFilter_clicked()
 {
+    // ==== Smoothing =========================================================
     if(QString::compare(ui->spacialFilterComboBox->currentText(),
                         tr("Smoothing")) == 0){
         int dim = ui->spacialSizeSpin->value();
         std::vector<std::vector<double> > kernel = ImageProcess::createKernelSmoothing(dim);
         m_procIm = std::make_unique<QImage>(ImageProcess::convolve(*(m_origIm.get()), kernel));
-    } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
-                               tr("Median")) == 0) {
-        int dim = ui->spacialSizeSpin->value();
-        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
-                         dim, 0.0, ImageProcess::medianConv));
-    } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+    }
+    // ==== Sharpening Laplacian ==============================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
                                tr("Sharpening Laplacian")) == 0) {
         int dim = ui->spacialSizeSpin->value();
         std::vector<std::vector<double> > kernel = ImageProcess::createKernelLaplacian(dim);
         m_procIm = std::make_unique<QImage>(ImageProcess::convolveLoG(*(m_origIm.get()), kernel));
-    } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+    }
+    // ==== High-Boost ========================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
                                tr("High-Boost")) == 0) {
         int dim = ui->spacialSizeSpin->value();
         int k = ui->hbConstSpin->value();
-        m_procIm = std::make_unique<QImage>(ImageProcess::highboost(*(m_origIm.get()), dim, k));
-    } else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+        if(k < 0){
+            QMessageBox messageBox;
+            messageBox.setText("Error: High-Boost filter constant must be greater than or equal to 0.");
+            messageBox.setFixedSize(500,200);
+            messageBox.exec();
+        } else
+            m_procIm = std::make_unique<QImage>(ImageProcess::highboost(*(m_origIm.get()), dim, k));
+    }
+    // ==== Histogram Eq ======================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
                                tr("Histogram Equalization")) == 0) {
         int dim = ui->spacialSizeSpin->value();
         m_procIm = std::make_unique<QImage>(ImageProcess::localHistEqualization(*(m_origIm.get()), dim));
+    }
+    // ==== Median ============================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Median")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::medianConv));
+    }
+    // ==== Max ===============================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Max")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::maxConv));
+    }
+    // ==== Min ===============================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Min")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::minConv));
+    }
+    // ==== Arithmetic Mean ===================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Arithmetic Mean")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::ameanConv));
+    }
+    // ==== Geometric Mean ====================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Geometric Mean")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::gmeanConv));
+    }
+    // ==== Harmonic Mean =====================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Harmonic Mean")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::hmeanConv));
+    }
+    // ==== Contraharmonic Mean ===============================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Contraharmonic Mean")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        double Q = ui->hbConstSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, Q, ImageProcess::chmeanConv));
+    }
+    // ==== Midpoint ==========================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Midpoint")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                         dim, 0.0, ImageProcess::midpointConv));
+    }
+    // ==== Alpha-Trimmed Mean =====================================================
+    else if(QString::compare(ui->spacialFilterComboBox->currentText(),
+                               tr("Alpha-Trimmed Mean")) == 0) {
+        int dim = ui->spacialSizeSpin->value();
+        int d = ui->atSpinBox->value();
+        if(d > dim*dim){
+            QMessageBox messageBox;
+            messageBox.setText("Error: Alpha-trimmed constant must be smaller than the number of pixels in the kernel.");
+            messageBox.setFixedSize(500,200);
+            messageBox.exec();
+        } else
+            m_procIm = std::make_unique<QImage>(ImageProcess::convolveHSV(*(m_origIm.get()), NULL,
+                                                                dim, d, ImageProcess::atmeanConv));
     }
     display(m_origIm, m_procIm);
     on_image_process();

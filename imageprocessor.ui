@@ -172,7 +172,7 @@
               <x>0</x>
               <y>0</y>
               <width>231</width>
-              <height>601</height>
+              <height>626</height>
              </rect>
             </property>
             <layout class="QVBoxLayout" name="vertLayout">
@@ -337,13 +337,13 @@
                <property name="minimumSize">
                 <size>
                  <width>0</width>
-                 <height>152</height>
+                 <height>180</height>
                 </size>
                </property>
                <property name="maximumSize">
                 <size>
                  <width>16777215</width>
-                 <height>152</height>
+                 <height>180</height>
                 </size>
                </property>
                <property name="title">
@@ -485,7 +485,7 @@
                  </rect>
                 </property>
                 <property name="text">
-                 <string>High-Boost Constant:</string>
+                 <string>HB + CH Mean Const:</string>
                 </property>
                </widget>
                <widget class="QDoubleSpinBox" name="hbConstSpin">
@@ -504,7 +504,7 @@
                  <number>1</number>
                 </property>
                 <property name="minimum">
-                 <double>1.000000000000000</double>
+                 <double>-10.000000000000000</double>
                 </property>
                 <property name="maximum">
                  <double>10.000000000000000</double>
@@ -520,13 +520,39 @@
                 <property name="geometry">
                  <rect>
                   <x>10</x>
-                  <y>120</y>
+                  <y>150</y>
                   <width>211</width>
                   <height>25</height>
                  </rect>
                 </property>
                 <property name="text">
                  <string>Apply</string>
+                </property>
+               </widget>
+               <widget class="QSpinBox" name="atSpinBox">
+                <property name="geometry">
+                 <rect>
+                  <x>167</x>
+                  <y>120</y>
+                  <width>51</width>
+                  <height>26</height>
+                 </rect>
+                </property>
+                <property name="singleStep">
+                 <number>2</number>
+                </property>
+               </widget>
+               <widget class="QLabel" name="atConstLabel">
+                <property name="geometry">
+                 <rect>
+                  <x>6</x>
+                  <y>120</y>
+                  <width>151</width>
+                  <height>20</height>
+                 </rect>
+                </property>
+                <property name="text">
+                 <string>Alpha-Trim Constant:</string>
                 </property>
                </widget>
                <zorder>spacialFilterComboBox</zorder>
@@ -536,6 +562,8 @@
                <zorder>hbConstSpin</zorder>
                <zorder>applySpacialFilter</zorder>
                <zorder>spacialSizeLabel</zorder>
+               <zorder>atSpinBox</zorder>
+               <zorder>atConstLabel</zorder>
               </widget>
              </item>
              <item>

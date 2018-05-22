@@ -417,11 +417,11 @@ QImage ImageProcess::convolveHSV(const QImage &im, const std::vector<int> *kerne
 
  int ImageProcess::gmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c)
  {
-     int prod = 0;
+     int logSum = 0;
      for(int i = 0; i < vals.size(); ++i){
-         prod *= vals[i];
+         logSum += log(vals[i]);
      }
-     return round(std::pow(prod,1.0/dim*dim));
+     return round(exp(logSum/(dim*dim)));
  }
 
  int ImageProcess::hmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c)
