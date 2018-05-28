@@ -47,10 +47,18 @@ namespace ImageProcess
     QImage localHistEqualization(const QImage &im, int dim);
     std::map<int,int> getNewHistEqValues(const QImage &im);
 
+    //dehaze
+    QImage getHazeDepth(const QImage &hazyIm);
+    QColor getAtmosphericLight(const QImage &hazyIm, const QImage &hazeDepth);
+    QImage dehaze(const QImage &hazyIm, const QImage &hazeDepth, const double beta);
+    QImage trainDehaze(const QString dataFolder, const int numIters);
+
     //misc
     QImage padImage(const QImage &im, int padding);
     QImage removePadding(const QImage &padded, int padding);
     QImage sub(const QImage &im1, const QImage &im2);
+    QImage subHsv(const QImage &im1, const QImage &im2);
+    QImage addHsv(const QImage &im1, const QImage &im2);
 }
 
 #endif // IMAGEPROCESS_H

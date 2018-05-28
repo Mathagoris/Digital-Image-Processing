@@ -39,6 +39,10 @@ private slots:
 
     void on_histEqualButton_clicked();
 
+    void on_createHazeDepth_clicked();
+
+    void on_applyDehaze_clicked();
+
 private:
     void display(const std::unique_ptr<QImage> &origIm, const std::unique_ptr<QImage> &procIm);
     void resetUI();

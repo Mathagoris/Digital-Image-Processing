@@ -4,6 +4,8 @@
 #include <math.h>
 #include <limits>
 #include <memory>
+#include <random>
+#include
 
 const unsigned char bit0 = 0b00000001;
 const unsigned char bit1 = 0b00000010;
@@ -13,6 +15,23 @@ const unsigned char bit4 = 0b00010000;
 const unsigned char bit5 = 0b00100000;
 const unsigned char bit6 = 0b01000000;
 const unsigned char bit7 = 0b10000000;
+
+// dehaze coefficients set to optimal values. Can    also be retrained
+double theta_0 = 0.121779;
+double theta_1 = 0.959710;
+double theta_2 = -0.780245;
+double sigma = 0.041337;
+
+struct DepthPixel {
+    int i;
+    int j;
+    double value;
+    bool operator<(DepthPixel other) const
+    {
+        return value > other.value;
+    }
+
+};
 
 
 // ==== IMAGE RESIZE ==============================================================================
@@ -417,7 +436,7 @@ QImage ImageProcess::convolveHSV(const QImage &im, const std::vector<int> *kerne
 
  int ImageProcess::gmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c)
  {
-     int logSum = 0;
+     double logSum = 0.0;
      for(int i = 0; i < vals.size(); ++i){
          logSum += log(vals[i]);
      }
@@ -435,13 +454,13 @@ QImage ImageProcess::convolveHSV(const QImage &im, const std::vector<int> *kerne
 
  int ImageProcess::chmeanConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c)
  {
-     double denom = 0.0;
      double nume = 0.0;
+     double denom = 0.0;
      for(int i = 0; i < vals.size(); ++i){
-         denom += std::pow(vals[i], c+1);
-         nume += std::pow(vals[i], c);
+         nume += std::pow(vals[i], c+1);
+         denom += std::pow(vals[i], c);
      }
-     return round(denom/nume);
+     return round(nume/denom);
  }
 
  int ImageProcess::midpointConv(std::vector<int> &vals, const std::vector<int> *kernel, const int dim, const double c)
@@ -593,6 +612,84 @@ std::map<int,int> ImageProcess::getNewHistEqValues(const QImage &im)
     return newValues;
 }
 
+// ==== Dehaze ====================================================================================
+//
+//
+// ================================================================================================
+
+QImage ImageProcess::getHazeDepth(const QImage &hazyIm)
+{
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution(0.0, sigma);
+
+    QImage hazeDepth(hazyIm.width(), hazyIm.height(), QImage::Format_Grayscale8);
+    for(int i = 0; i < hazyIm.width(); ++i){
+        for(int j = 0; j < hazyIm.height(); ++j){
+            double depth;
+            double noise = distribution(generator);
+            QColor newColor;
+            QColor pixel = QColor(hazyIm.pixel(i,j));
+            depth = std::min(std::max(theta_0 + theta_1 * pixel.valueF() + theta_2 * pixel.saturationF() + noise, 0.0), 1.0);
+            newColor.setRgbF(depth,depth,depth);
+            hazeDepth.setPixel(i,j,newColor.rgb());
+        }
+    }
+    return hazeDepth;
+}
+
+QColor ImageProcess::getAtmosphericLight(const QImage &hazyIm, const QImage &hazeDepth)
+{
+    int top = round((hazyIm.width()*hazyIm.height()) * 0.1);
+    std::vector<DepthPixel> intensities;
+    for(int i = 0; i < hazyIm.width(); ++i){
+        for(int j = 0; j < hazyIm.height(); ++j){
+            intensities.push_back({i,j,QColor(hazeDepth.pixel(i,j)).toHsv().valueF()});
+        }
+    }
+    std::sort(intensities.begin(), intensities.end());
+    QColor A = QColor(hazyIm.pixel(intensities[0].i, intensities[0].j)).toHsv();
+    for(int x = 1; x < top; ++x){
+        if(A.valueF() < intensities[x].value)
+            A = QColor(hazyIm.pixel(intensities[x].i, intensities[x].j)).toHsv();
+    }
+    return A;
+}
+
+QImage ImageProcess::dehaze(const QImage &hazyIm, const QImage &hazeDepth, const double beta)
+{
+    QImage procIm = QImage(hazyIm.width(), hazyIm.height(), hazyIm.format());
+    QColor A = getAtmosphericLight(hazyIm, hazeDepth);
+
+    for(int i = 0; i < hazyIm.width(); ++i){
+        for(int j = 0; j < hazyIm.height(); ++j){
+            QColor newColor;
+            newColor = newColor.toHsv();
+            QColor pixel = QColor(hazyIm.pixel(i,j)).toHsv();
+            double h,s,v = 0.0;
+            double t = std::min(std::max(exp(-(beta*QColor(hazeDepth.pixel(i,j)).redF())),0.1),0.9);
+            h = pixel.hueF();
+            s = std::min(std::max(((pixel.saturationF()-A.saturationF())/t)+A.saturationF(),0.0),1.0);
+            v = std::min(std::max(((pixel.valueF()-A.valueF())/t)+A.valueF(),0.0),1.0);
+            newColor.setHsvF(h,s,v);
+
+            procIm.setPixel(i,j, newColor.toRgb().rgb());
+        }
+    }
+    return procIm;
+}
+
+QImage ImageProcess::trainDehaze(const QString dataFolder, const int numIters)
+{
+    theta_0 = 0.0;
+    theta_1 = 1.0;
+    theta_2 = -1.0;
+    double sum, wSum, vSum, sSum = 0.0;
+    for(int t = 0; t < numIters; ++t){
+        for (auto & p : fs::directory_iterator(dataFolder.toStdString() + "Haze-Free/"))
+            std::cout << p << std::endl;
+    }
+}
+
 // ==== MISC ======================================================================================
 //
 //
@@ -658,6 +755,47 @@ QImage ImageProcess::sub(const QImage &im1,const QImage &im2)
             newColor.setBlue(std::max(QColor(im1.pixel(i,j)).blue() -
                                      QColor(im2.pixel(i,j)).blue(),0));
             procIm.setPixel(i,j,newColor.rgb());
+        }
+    }
+    return procIm;
+}
+
+
+QImage ImageProcess::subHsv(const QImage &im1, const QImage &im2)
+{
+    QImage procIm = QImage(im1.width(), im1.height(), im1.format());
+    for(int i = 0; i < im1.width(); ++i){
+        for(int j = 0; j < im1.height(); ++j){
+            QColor newColor;
+            newColor = newColor.toHsv();
+            int h,s,v;
+            QColor color1 = QColor(im1.pixel(i,j)).toHsv();
+            QColor color2 = QColor(im2.pixel(i,j)).toHsv();
+            h = (color1.hue() - color2.hue()) % 360;
+            s = std::max(color1.saturation() - color2.saturation(), 0);
+            v = std::max(color1.value() - color2.value(), 0);
+            newColor.setHsv(h,s,v);
+            procIm.setPixel(i,j,newColor.toRgb().rgb());
+        }
+    }
+    return procIm;
+}
+
+QImage ImageProcess::addHsv(const QImage &im1, const QImage &im2)
+{
+    QImage procIm = QImage(im1.width(), im1.height(), im1.format());
+    for(int i = 0; i < im1.width(); ++i){
+        for(int j = 0; j < im1.height(); ++j){
+            QColor newColor;
+            newColor = newColor.toHsv();
+            int h,s,v;
+            QColor color1 = QColor(im1.pixel(i,j)).toHsv();
+            QColor color2 = QColor(im2.pixel(i,j)).toHsv();
+            h = (color1.hue() + color2.hue()) % 360;
+            s = std::max(color1.saturation() - color2.saturation(), 0);
+            v = std::max(color1.value() - color2.value(), 0);
+            newColor.setHsv(h,s,v);
+            procIm.setPixel(i,j,newColor.toRgb().rgb());
         }
     }
     return procIm;

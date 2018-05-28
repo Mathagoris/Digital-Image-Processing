@@ -20,12 +20,6 @@ ImageProcessor::ImageProcessor(QWidget *parent) :
     ui->processScrollAreaContents->resize(ui->processScrollAreaContents->size());
 
     m_origIm = std::make_unique<QImage>();
-
-//    QString filename = "/home/mathius/Documents/CS555/DigitalImageProcessing/images/climb.jpg";
-//    m_origIm->load(filename);
-
-//    m_origIm->convertToFormat(QImage::Format_Grayscale8);
-//    ui->imageLabel->setPixmap(QPixmap::fromImage(m_origIm));
 }
 
 ImageProcessor::~ImageProcessor()
@@ -288,5 +282,25 @@ void ImageProcessor::on_histEqualButton_clicked()
 {
     m_procIm = std::make_unique<QImage>(ImageProcess::globalHistEqualization(*(m_origIm.get())));
     display(m_origIm,m_procIm);
+    on_image_process();
+}
+
+void ImageProcessor::on_createHazeDepth_clicked()
+{
+    m_procIm = std::make_unique<QImage>(ImageProcess::getHazeDepth(*(m_origIm.get())));
+    display(m_origIm, m_procIm);
+    on_image_process();
+}
+
+void ImageProcessor::on_applyDehaze_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,tr("Open Depth Image"),
+                       "",
+                       tr("Image Files (*.png *.jpg *.bmp)"));
+    if(QString::compare(filename, "") != 0){
+        QImage tempIm(filename);
+        m_procIm = std::make_unique<QImage>(ImageProcess::dehaze(*(m_origIm.get()), tempIm, ui->betaSpin->value()));
+    }
+    display(m_origIm, m_procIm);
     on_image_process();
 }
