@@ -5,8 +5,11 @@
 #include <limits>
 #include <memory>
 #include <random>
-#include
+#include <dirent.h>
+#include <qdebug.h>
+#include <bitset>
 
+// bitplane masks
 const unsigned char bit0 = 0b00000001;
 const unsigned char bit1 = 0b00000010;
 const unsigned char bit2 = 0b00000100;
@@ -15,12 +18,18 @@ const unsigned char bit4 = 0b00010000;
 const unsigned char bit5 = 0b00100000;
 const unsigned char bit6 = 0b01000000;
 const unsigned char bit7 = 0b10000000;
+const unsigned char bit_planes[] = { bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7 };
 
 // dehaze coefficients set to optimal values. Can    also be retrained
 double theta_0 = 0.121779;
 double theta_1 = 0.959710;
 double theta_2 = -0.780245;
 double sigma = 0.041337;
+
+// rle encoding consts
+const int ESC = 0;
+const int EOL = 0;
+const int EOF = 1;
 
 struct DepthPixel {
     int i;
@@ -33,6 +42,19 @@ struct DepthPixel {
 
 };
 
+std::vector<QString> read_directory(const QString &dir_name)
+{
+    std::vector<QString> v;
+    DIR* dirp = opendir(dir_name.toStdString().c_str());
+    struct dirent * dp;
+    while ((dp = readdir(dirp)) != NULL) {
+        QString str(dp->d_name);
+        if(QString::compare(str, ".") != 0 && QString::compare(str, "..") != 0)
+            v.push_back(QString(dp->d_name));
+    }
+    closedir(dirp);
+    return v;
+}
 
 // ==== IMAGE RESIZE ==============================================================================
 //
@@ -488,33 +510,7 @@ QImage ImageProcess::convolveHSV(const QImage &im, const std::vector<int> *kerne
 QImage ImageProcess::removeBitPlane(const QImage &im, int plane, bool zeroOut)
 {
     QImage procIm = QImage(im.width(), im.height(), im.format());
-    int bit;
-    switch (plane) {
-    case 0:
-        bit = bit0;
-        break;
-    case 1:
-        bit = bit1;
-        break;
-    case 2:
-        bit = bit2;
-        break;
-    case 3:
-        bit = bit3;
-        break;
-    case 4:
-        bit = bit4;
-        break;
-    case 5:
-        bit = bit5;
-        break;
-    case 6:
-        bit = bit6;
-        break;
-    default:
-        bit = bit7;
-        break;
-    }
+    int bit = bit_planes[plane];
     for(int i = 0; i < im.width(); ++i){
         for(int j = 0; j < im.height(); ++j){
             QColor newColor;
@@ -639,7 +635,7 @@ QImage ImageProcess::getHazeDepth(const QImage &hazyIm)
 
 QColor ImageProcess::getAtmosphericLight(const QImage &hazyIm, const QImage &hazeDepth)
 {
-    int top = round((hazyIm.width()*hazyIm.height()) * 0.1);
+    int top = round((hazyIm.width()*hazyIm.height()) * 0.001);
     std::vector<DepthPixel> intensities;
     for(int i = 0; i < hazyIm.width(); ++i){
         for(int j = 0; j < hazyIm.height(); ++j){
@@ -652,7 +648,7 @@ QColor ImageProcess::getAtmosphericLight(const QImage &hazyIm, const QImage &haz
         if(A.valueF() < intensities[x].value)
             A = QColor(hazyIm.pixel(intensities[x].i, intensities[x].j)).toHsv();
     }
-    return A;
+    return A.toRgb();
 }
 
 QImage ImageProcess::dehaze(const QImage &hazyIm, const QImage &hazeDepth, const double beta)
@@ -663,19 +659,61 @@ QImage ImageProcess::dehaze(const QImage &hazyIm, const QImage &hazeDepth, const
     for(int i = 0; i < hazyIm.width(); ++i){
         for(int j = 0; j < hazyIm.height(); ++j){
             QColor newColor;
-            newColor = newColor.toHsv();
-            QColor pixel = QColor(hazyIm.pixel(i,j)).toHsv();
-            double h,s,v = 0.0;
+            QColor pixel = QColor(hazyIm.pixel(i,j));
+            double r,g,b;
             double t = std::min(std::max(exp(-(beta*QColor(hazeDepth.pixel(i,j)).redF())),0.1),0.9);
-            h = pixel.hueF();
-            s = std::min(std::max(((pixel.saturationF()-A.saturationF())/t)+A.saturationF(),0.0),1.0);
-            v = std::min(std::max(((pixel.valueF()-A.valueF())/t)+A.valueF(),0.0),1.0);
-            newColor.setHsvF(h,s,v);
+            r = std::min(std::max(((pixel.redF()-A.redF())/t)+A.redF(),0.0),1.0);
+            g = std::min(std::max(((pixel.greenF()-A.greenF())/t)+A.greenF(),0.0),1.0);
+            b = std::min(std::max(((pixel.blueF()-A.blueF())/t)+A.blueF(),0.0),1.0);
+            newColor.setRgbF(r,g,b);
 
-            procIm.setPixel(i,j, newColor.toRgb().rgb());
+            procIm.setPixel(i,j, newColor.rgb());
         }
     }
     return procIm;
+}
+
+void ImageProcess::createDehazeTrainSet(const QString dataFolder, double beta)
+{
+    std::default_random_engine generator;
+    std::uniform_real_distribution<double> distribution(0.0,1.0);
+    std::uniform_real_distribution<double> atm_distribution(0.85,1);
+    std::vector<QString> img_filenames = read_directory(dataFolder + "/Haze-Free");
+
+    for (QString filename : img_filenames){
+        QImage hazeFree(dataFolder + "/Haze-Free/" + filename);
+        QImage hazyIm(hazeFree.width(), hazeFree.height(), hazeFree.format());
+        QImage depthIm(hazeFree.width(), hazeFree.height(), QImage::Format_Grayscale8);
+        QColor A;
+        A.setRgbF(atm_distribution(generator),atm_distribution(generator),atm_distribution(generator));
+        for(int i = 0; i < hazyIm.width(); ++i){
+            for(int j = 0; j < hazyIm.height(); ++j){
+                // Set Depth Image pixel
+                double depth = distribution(generator);
+                QColor depthColor;
+                depthColor.setRgbF(depth,depth,depth);
+                depthIm.setPixel(i,j,depthColor.rgb());
+
+                // Set Hazy Image pixel
+                QColor newColor;
+                QColor pixel = QColor(hazeFree.pixel(i,j));
+                double t = exp(-(beta*depth));
+                double r,g,b;
+                r = std::min(std::max(pixel.redF()*t + A.redF()*(1-t),0.0),1.0);
+                g = std::min(std::max(pixel.greenF()*t + A.greenF()*(1-t),0.0),1.0);
+                b = std::min(std::max(pixel.blueF()*t + A.blueF()*(1-t),0.0),1.0);
+
+                newColor.setRgbF(r,g,b);
+                hazyIm.setPixel(i,j,newColor.rgb());
+            }
+        }
+        QString hazyPath = dataFolder + "/Hazy/";
+        QString depthPath = dataFolder + "/Depth/";
+        // "####.jpg"
+        QString imgNum = filename.right(8);
+        hazyIm.save(hazyPath + "hazy" + imgNum);
+        depthIm.save(depthPath + "depth" + imgNum);
+    }
 }
 
 QImage ImageProcess::trainDehaze(const QString dataFolder, const int numIters)
@@ -683,11 +721,145 @@ QImage ImageProcess::trainDehaze(const QString dataFolder, const int numIters)
     theta_0 = 0.0;
     theta_1 = 1.0;
     theta_2 = -1.0;
-    double sum, wSum, vSum, sSum = 0.0;
+    double sum = 0.0, wSum = 0.0, vSum= 0.0, sSum = 0.0;
+    std::vector<QString> hazy_img_filenames = read_directory(dataFolder + "/Hazy");
+    std::vector<QString> depth_img_filenames = read_directory(dataFolder + "/Depth");
+    std::sort(hazy_img_filenames.begin(), hazy_img_filenames.end());
+    std::sort(depth_img_filenames.begin(), depth_img_filenames.end());
+
+    int n = hazy_img_filenames.size();
+
     for(int t = 0; t < numIters; ++t){
-        for (auto & p : fs::directory_iterator(dataFolder.toStdString() + "Haze-Free/"))
-            std::cout << p << std::endl;
+        for(int x = 0; x < n; ++x){
+            QImage hazyIm(dataFolder + "/Hazy/" + hazy_img_filenames[x]);
+            QImage depthIm(dataFolder + "/Depth/" + depth_img_filenames[x]);
+            for(int i = 0; i < hazyIm.width(); ++i){
+                for(int j = 0; j < hazyIm.height(); ++j){
+                    QColor hazyPixel = QColor(hazyIm.pixel(i,j)).toHsv();
+                    double temp = QColor(depthIm.pixel(i,j)).redF() - theta_0
+                            - theta_1 * hazyPixel.valueF()
+                            - theta_2 * hazyPixel.saturationF();
+                    wSum += temp;
+                    vSum += hazyPixel.valueF() * temp;
+                    sSum += hazyPixel.saturationF() * temp;
+                    sum += temp * temp;
+                }
+            }
+        }
+        sigma = pow(sum/n, 0.5);
+        theta_0 += wSum; theta_1 += vSum; theta_2 += sSum;
+        qDebug() << "Theta 0: " << theta_0;
+        qDebug() << "Theta 1: " << theta_1;
+        qDebug() << "Theta 2: " << theta_2;
+        qDebug() << "Sigma: " << sigma;
     }
+}
+
+// ==== Compression ===============================================================================
+//
+//
+// ================================================================================================
+
+bool ImageProcess::compressImage(const QImage &im, const QString filename, int method)
+{
+    std::vector<std::bitset<8> > compressedImage;
+    switch (method) {
+    case 0:
+        compressedImage = rleGrayEncode(im);
+        break;
+    case 1:
+        compressedImage = rleBitPlaneEncode(im);
+        break;
+    case 2:
+        compressedImage = huffmanEncode(im);
+        break;
+    default:
+        break;
+    }
+
+}
+
+QImage ImageProcess::decompressImage(const QString filename, int method)
+{
+
+}
+
+std::vector<bitset<16> > ImageProcess::rleEncode(const QImage &im, const unsigned char plane)
+{
+    std::vector<std::bitset<8> > encoding;
+    int run_count = 0, last_val = -1;
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < im.height(); ++j){
+            int pixel_val = QColor(im.pixel(i,j)).red();
+            // sets pixel_val to 1 if the bit in bit plane is 1 0 if not
+            // ignore if we are encoding gray image intensities
+            if(plane != 0)
+                pixel_val = pixel_val & plane > 0 ? 1 : 0;
+            if(last_val == pixel_val){
+                if(run_count > 254){
+                    encoding.push_back(std::bitset<8>(run_count));
+                    encoding.push_back(std::bitset<8>(last_val));
+                    run_count = 1;
+                } else {
+                    run_count += 1;
+                }
+            } else {
+                encoding.push_back(std::bitset<8>(run_count));
+                encoding.push_back(std::bitset<8>(last_val));
+                run_count = 1;
+                last_val = pixel_val;
+            }
+        }
+        encoding.push_back(std::bitset<8>(run_count));
+        encoding.push_back(std::bitset<8>(last_val));
+        encoding.push_back(std::bitset<8>(ESC));
+        encoding.push_back(std::bitset<8>(EOL));
+    }
+    encoding.push_back(std::bitset<8>(ESC));
+    encoding.push_back(std::bitset<8>(EOF));
+    return encoding;
+}
+
+std::vector<bitset<16> > ImageProcess::rleGrayEncode(const QImage &im)
+{
+    return rleEncode(im, 0);
+}
+
+std::vector<bitset<16> > ImageProcess::rleBitPlaneEncode(const QImage &im)
+{
+    std::vector<bitset<16> > single_plane_encoding;
+    std::vector<bitset<16> > full_encoding;
+    for(unsigned char plane : bit_planes){
+        single_plane_encoding = rleEncode(im, plane);
+        single_plane_encoding.pop_back();
+        single_plane_encoding.pop_back();
+        for(int i = 0; i < single_plane_encoding.size(); ++i)
+            full_encoding.push_back(single_plane_encoding[i]);
+        single_plane_encoding.clear();
+    }
+    full_encoding.push_back(std::bitset<8>(ESC));
+    full_encoding.push_back(std::bitset<8>(EOF));
+    return full_encoding;
+}
+
+std::vector<bitset<16> > ImageProcess::huffmanEncode(const QImage &im)
+{
+
+}
+
+QImage ImageProcess::rleGrayDecode(const std::vector<bool> &bits)
+{
+
+}
+
+QImage ImageProcess::rleBitPlaneDecode(const std::vector<bool> &bits)
+{
+
+}
+
+QImage ImageProcess::huffmanDecode(const std::vector<bool> &bits)
+{
+
 }
 
 // ==== MISC ======================================================================================
@@ -800,3 +972,5 @@ QImage ImageProcess::addHsv(const QImage &im1, const QImage &im2)
     }
     return procIm;
 }
+
+

@@ -304,3 +304,19 @@ void ImageProcessor::on_applyDehaze_clicked()
     display(m_origIm, m_procIm);
     on_image_process();
 }
+
+void ImageProcessor::on_createDatasetButton_clicked()
+{
+    QString train_set_folder = QFileDialog::getExistingDirectory(this,tr("Open Training Set Directory"), "");
+    if(QString::compare(train_set_folder, "") != 0){
+        ImageProcess::createDehazeTrainSet(train_set_folder, ui->betaSpin->value());
+    }
+}
+
+void ImageProcessor::on_trainDehazeButton_clicked()
+{
+    QString train_set_folder = QFileDialog::getExistingDirectory(this,tr("Open Training Set Directory"), "");
+    if(QString::compare(train_set_folder, "") != 0){
+        ImageProcess::trainDehaze(train_set_folder, 517);
+    }
+}

@@ -2,6 +2,7 @@
 #define IMAGEPROCESS_H
 
 #include <QMainWindow>
+#include <bitset>
 #include <memory>
 
 namespace ImageProcess
@@ -51,7 +52,19 @@ namespace ImageProcess
     QImage getHazeDepth(const QImage &hazyIm);
     QColor getAtmosphericLight(const QImage &hazyIm, const QImage &hazeDepth);
     QImage dehaze(const QImage &hazyIm, const QImage &hazeDepth, const double beta);
+    void createDehazeTrainSet(const QString dataFolder, double beta);
     QImage trainDehaze(const QString dataFolder, const int numIters);
+
+    //compression
+    bool compressImage(const QImage &im, const QString filename, int method);
+    QImage decompressImage(const QString filename, int method);
+    std::vector<bitset<16> > rleEncode(const QImage & im, const unsigned char plane);
+    std::vector<bitset<16> > rleGrayEncode(const QImage &im);
+    std::vector<bitset<16> > rleBitPlaneEncode(const QImage &im);
+    std::vector<bitset<16> > huffmanEncode(const QImage &im);
+    QImage rleGrayDecode(const std::vector<bitset<16> > &bits);
+    QImage rleBitPlaneDecode(const std::vector<bitset<16> > &bits);
+    QImage huffmanDecode(const std::vector<bitset<16> > &bits);
 
     //misc
     QImage padImage(const QImage &im, int padding);

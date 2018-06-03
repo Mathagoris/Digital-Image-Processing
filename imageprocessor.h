@@ -43,6 +43,10 @@ private slots:
 
     void on_applyDehaze_clicked();
 
+    void on_createDatasetButton_clicked();
+
+    void on_trainDehazeButton_clicked();
+
 private:
     void display(const std::unique_ptr<QImage> &origIm, const std::unique_ptr<QImage> &procIm);
     void resetUI();

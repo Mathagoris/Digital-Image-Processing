@@ -436,7 +436,7 @@
                <property name="alignment">
                 <set>Qt::AlignCenter</set>
                </property>
-               <widget class="QPushButton" name="pushButton">
+               <widget class="QPushButton" name="trainDehazeButton">
                 <property name="geometry">
                  <rect>
                   <x>8</x>
@@ -462,7 +462,7 @@
                  <string>Apply</string>
                 </property>
                </widget>
-               <widget class="QPushButton" name="pushButton_3">
+               <widget class="QPushButton" name="createDatasetButton">
                 <property name="geometry">
                  <rect>
                   <x>8</x>
