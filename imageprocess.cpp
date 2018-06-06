@@ -9,38 +9,66 @@
 #include <qdebug.h>
 #include <bitset>
 
-// bitplane masks
-const unsigned char bit0 = 0b00000001;
-const unsigned char bit1 = 0b00000010;
-const unsigned char bit2 = 0b00000100;
-const unsigned char bit3 = 0b00001000;
-const unsigned char bit4 = 0b00010000;
-const unsigned char bit5 = 0b00100000;
-const unsigned char bit6 = 0b01000000;
-const unsigned char bit7 = 0b10000000;
-const unsigned char bit_planes[] = { bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7 };
+namespace {
+    // bitplane masks
+    const unsigned char bit0 = 0b00000001;
+    const unsigned char bit1 = 0b00000010;
+    const unsigned char bit2 = 0b00000100;
+    const unsigned char bit3 = 0b00001000;
+    const unsigned char bit4 = 0b00010000;
+    const unsigned char bit5 = 0b00100000;
+    const unsigned char bit6 = 0b01000000;
+    const unsigned char bit7 = 0b10000000;
+    const unsigned char bit_planes[] = { bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7 };
 
-// dehaze coefficients set to optimal values. Can    also be retrained
-double theta_0 = 0.121779;
-double theta_1 = 0.959710;
-double theta_2 = -0.780245;
-double sigma = 0.041337;
+    // dehaze coefficients set to optimal values. Can    also be retrained
+    double theta_0 = 0.121779;
+    double theta_1 = 0.959710;
+    double theta_2 = -0.780245;
+    double sigma = 0.041337;
 
-// rle encoding consts
-const int ESC = 0;
-const int EOL = 0;
-const int EOF = 1;
+    // rle encoding consts
+    const int ESC = 0;
+    const int EOL = 0;
+    const int EOF = 1;
 
-struct DepthPixel {
-    int i;
-    int j;
-    double value;
-    bool operator<(DepthPixel other) const
+    struct DepthPixel {
+        int i;
+        int j;
+        double value;
+        bool operator<(DepthPixel other) const
+        {
+            return value > other.value;
+        }
+
+    };
+
+    struct FreqNode
     {
-        return value > other.value;
-    }
+        int val;
+        int freq;
+        FreqNode *left, *right;
+        FreqNode(int val, int freq)
+        {
+            left = right = NULL;
+            this->val = val;
+            this->freq = freq;
+        }
+        bool operator<(FreqNode* other)
+        {
+            return freq < other->freq;
+        }
+    };
 
-};
+    struct FreqCompare {
+
+        bool operator()(FreqNode* l, FreqNode* r)
+
+        {
+            return (l->freq > r->freq);
+        }
+    };
+}
 
 std::vector<QString> read_directory(const QString &dir_name)
 {
@@ -784,7 +812,7 @@ QImage ImageProcess::decompressImage(const QString filename, int method)
 
 }
 
-std::vector<bitset<16> > ImageProcess::rleEncode(const QImage &im, const unsigned char plane)
+std::vector<bitset<8> > ImageProcess::rleEncode(const QImage &im, const unsigned char plane)
 {
     std::vector<std::bitset<8> > encoding;
     int run_count = 0, last_val = -1;
@@ -820,12 +848,12 @@ std::vector<bitset<16> > ImageProcess::rleEncode(const QImage &im, const unsigne
     return encoding;
 }
 
-std::vector<bitset<16> > ImageProcess::rleGrayEncode(const QImage &im)
+std::vector<bitset<8> > ImageProcess::rleGrayEncode(const QImage &im)
 {
     return rleEncode(im, 0);
 }
 
-std::vector<bitset<16> > ImageProcess::rleBitPlaneEncode(const QImage &im)
+std::vector<bitset<8> > ImageProcess::rleBitPlaneEncode(const QImage &im)
 {
     std::vector<bitset<16> > single_plane_encoding;
     std::vector<bitset<16> > full_encoding;
@@ -842,24 +870,81 @@ std::vector<bitset<16> > ImageProcess::rleBitPlaneEncode(const QImage &im)
     return full_encoding;
 }
 
-std::vector<bitset<16> > ImageProcess::huffmanEncode(const QImage &im)
+std::vector<bitset<8> > ImageProcess::huffmanEncode(const QImage &im)
+{
+    std::vector<FreqNode> probabilities = getHistogram(im);
+    std::map<int, std::string> huffTbl = huffmanCodes(probabilities);
+
+}
+
+QImage ImageProcess::rleGrayDecode(const std::vector<bitset<8> > &bits)
 {
 
 }
 
-QImage ImageProcess::rleGrayDecode(const std::vector<bool> &bits)
+QImage ImageProcess::rleBitPlaneDecode(const std::vector<bitset<8> > &bits)
 {
 
 }
 
-QImage ImageProcess::rleBitPlaneDecode(const std::vector<bool> &bits)
+QImage ImageProcess::huffmanDecode(const std::vector<bitset<8> > &bits)
 {
 
 }
 
-QImage ImageProcess::huffmanDecode(const std::vector<bool> &bits)
+std::map<int, std::string> ImageProcess::huffmanTable(std::vector<FreqNode> &freqs)
 {
+    std::make_heap(freqs.begin(), freqs.end());
+    FreqNode *left, *right, *top;
 
+    // Iterate while size of heap doesn't become 1
+    while (freqs.size() != 1) {
+
+        // Extract the two minimum
+        // freq items from min heap
+        left = freqs.front();
+        std::pop_heap(freqs.begin(), freqs.end());
+        freqs.pop_back();
+
+        right = freqs.front();
+        std::pop_heap(freqs.begin(), freqs.end());
+        freqs.pop_back();
+
+        // Create a new internal node with
+        // frequency equal to the sum of the
+        // two nodes frequencies. Make the
+        // two extracted node as left and right children
+        // of this new node. Add this node
+        // to the min heap -1 is a special value
+        // for internal nodes, not used
+        top = new FreqNode(-1, left->freq + right->freq);
+
+        top->left = left;
+        top->right = right;
+
+        freqs.push_back(top);
+        std::push_heap(freqs.begin(), freqs.end());
+    }
+    std::map<int, std::string> huffTbl;
+    // Print Huffman codes using
+    // the Huffman tree built above
+    makeCodes(minHeap.top(), "", huffTbl);
+    return huffTbl;
+
+}
+
+namespace {
+    void makeCodes(FreqNode* root, std::string str, std::map<int, std::string> table)
+    {
+        if (!root)
+            return;
+
+        if (root->val != -1)
+            table[root->val] = str;
+
+        makeCodes(root->left, str + "0", table);
+        makeCodes(root->right, str + "1", table);
+    }
 }
 
 // ==== MISC ======================================================================================
@@ -971,6 +1056,25 @@ QImage ImageProcess::addHsv(const QImage &im1, const QImage &im2)
         }
     }
     return procIm;
+}
+
+std::vector<FreqNode> ImageProcess::getHistogram(const QImage &im)
+{
+    HashCounter<int> counter;
+    double numPixel = im.width() * im.height();
+    for(int i = 0; i < im.width(); ++i){
+        for(int j = 0; j < im.height(); ++j){
+            if(im.format() == QImage::Format_RGB32)
+                counter.increment(QColor(im.pixel(i,j)).toHsv().value());
+            else
+                counter.increment(QColor(im.pixel(i,j)).red());
+        }
+    }
+    std::vector <Prob> probs;
+    for(std::map<int,int>::iterator it = counter.begin(); it != counter.end(); ++it){
+        probs.push_back({it->first, double(it->second)/numPixel});
+    }
+    return probs;
 }
 
 

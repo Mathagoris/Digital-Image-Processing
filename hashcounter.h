@@ -26,6 +26,7 @@ public:
     typename std::map<K,int>::iterator begin() { return m_map.begin(); }
     typename std::map<K,int>::iterator end() { return m_map.end(); }
 
+
 private:
     std::map<K,int> m_map;
 };
